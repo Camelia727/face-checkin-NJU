@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人脸签到系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 400px; margin: 0 auto; background: white; border-radius: 10px; padding: 20px; }
+        h2 { text-align: center; margin-bottom: 20px; color: #333; }
+        .nav { display: flex; justify-content: space-around; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .nav button { background: none; border: none; color: #666; padding: 10px; cursor: pointer; font-size: 16px; }
+        .nav button.active { color: #1890ff; border-bottom: 2px solid #1890ff; }
+        .page { display: none; }
+        .page.active { display: block; }
+        input, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
+        button { background: #1890ff; color: white; border: none; cursor: pointer; }
+        button:active { background: #096dd9; }
+        .camera-box { width: 100%; height: 300px; background: #000; display: flex; align-items: center; justify-content: center; margin: 10px 0; border-radius: 8px; position: relative; overflow: hidden; }
+        .camera-box video, .camera-box img { width: 100%; height: 100%; object-fit: cover; }
+        .camera-box .placeholder { color: white; font-size: 18px; }
+        .result { padding: 15px; margin: 10px 0; border-radius: 6px; text-align: center; display: none; }
+        .result.success { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; display: block; }
+        .result.error { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; display: block; }
+        .record-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        #userInfo { text-align: center; margin-bottom: 15px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>📷 人脸签到系统</h2>
+        
+        <div class="nav">
+            <button onclick="showPage('register')" id="nav-register">注册</button>
+            <button onclick="showPage('login')" id="nav-login">登录</button>
+            <button onclick="showPage('checkin')" id="nav-checkin" class="active">签到</button>
+            <button onclick="showPage('records')" id="nav-records">记录</button>
+            <button onclick="showPage('photos')" id="nav-photos">照片库</button>
+        </div>
+
+        <!-- 注册页 -->
+        <div class="page" id="register">
+            <input type="text" id="reg-username" placeholder="用户名">
+            <input type="password" id="reg-password" placeholder="密码">
+            <input type="text" id="reg-name" placeholder="真实姓名">
+            <div class="camera-box" onclick="takePhoto('reg')">
+                <video id="reg-video" autoplay playsinline style="display:none;"></video>
+                <img id="reg-preview" style="display:none;">
+                <div class="placeholder" id="reg-placeholder">点击拍照</div>
+            </div>
+            <button onclick="register()">注册</button>
+            <div class="result" id="reg-result"></div>
+        </div>
+
+        <!-- 照片库页 -->
+        <div class="page" id="photos">
+            <div id="photoInfo">请先登录查看照片</div>
+            <div id="photo-display" style="text-align:center; margin: 20px 0;">
+                <img id="my-photo" style="max-width:100%; border-radius:8px; display:none;">
+            </div>
+        </div>
+
+        <!-- 登录页 -->
+        <div class="page" id="login">
+            <input type="text" id="login-username" placeholder="用户名">
+            <input type="password" id="login-password" placeholder="密码">
+            <button onclick="login()">登录</button>
+            <button onclick="logout()" style="background:#ff4d4f;">注销</button>
+            <div class="result" id="login-result"></div>
+        </div>
+
+        <!-- 签到页（无需登录） -->
+        <div class="page active" id="checkin">
+            <p style="text-align:center;color:#666;margin-bottom:10px;">无需登录，拍照即可签到</p>
+            <div class="camera-box" onclick="takePhoto('checkin')">
+                <video id="checkin-video" autoplay playsinline style="display:none;"></video>
+                <img id="checkin-preview" style="display:none;">
+                <div class="placeholder" id="checkin-placeholder">点击拍照签到</div>
+            </div>
+            <button onclick="checkin()">确认签到</button>
+            <div class="result" id="checkin-result"></div>
+        </div>
+
+        <!-- 记录页 -->
+        <div class="page" id="records">
+            <div id="userInfo">请先登录查看记录</div>
+            <div id="records-list"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://你的ECS公网IP:5000/api';  // 改成你的公网IP
+        let photoBlob = null;
+
+        function showPage(page) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+            document.getElementById(page).classList.add('active');
+            document.getElementById('nav-' + page).classList.add('active');
+            if (page === 'records') loadRecords();
+            if (page === 'photos') loadPhotos();
+        }
+
+        // 拍照功能
+        async function takePhoto(type) {
+            const video = document.getElementById(type + '-video');
+            const preview = document.getElementById(type + '-preview');
+            const placeholder = document.getElementById(type + '-placeholder');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+                video.srcObject = stream;
+                video.style.display = 'block';
+                placeholder.style.display = 'none';
+                
+                // 3秒后自动拍照
+                setTimeout(() => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    canvas.getContext('2d').drawImage(video, 0, 0);
+                    
+                    canvas.toBlob(blob => {
+                        photoBlob = blob;
+                        preview.src = URL.createObjectURL(blob);
+                        preview.style.display = 'block';
+                        video.style.display = 'none';
+                        stream.getTracks().forEach(t => t.stop());
+                    }, 'image/jpeg');
+                }, 2000);
+                
+            } catch (err) {
+                // 如果没有摄像头，允许选择文件
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.onchange = e => {
+                    photoBlob = e.target.files[0];
+                    preview.src = URL.createObjectURL(photoBlob);
+                    preview.style.display = 'block';
+                    placeholder.style.display = 'none';
+                };
+                input.click();
+            }
+        }
+
+        async function loadPhotos() {
+            const res = await fetch(API_URL + '/photos', { credentials: 'include' });
+            const data = await res.json();
+            const info = document.getElementById('photoInfo');
+            const img = document.getElementById('my-photo');
+            
+            if (!data.success) {
+                info.textContent = '请先登录查看照片';
+                img.style.display = 'none';
+                return;
+            }
+            
+            info.textContent = `照片上传时间: ${data.photo.upload_time}`;
+            img.src = data.photo.face_url;
+            img.style.display = 'block';
+        }
+
+        function showResult(id, msg, success) {
+            const el = document.getElementById(id);
+            el.textContent = msg;
+            el.className = 'result ' + (success ? 'success' : 'error');
+        }
+
+        async function register() {
+            if (!photoBlob) { showResult('reg-result', '请先拍照', false); return; }
+            
+            const form = new FormData();
+            form.append('username', document.getElementById('reg-username').value);
+            form.append('password', document.getElementById('reg-password').value);
+            form.append('real_name', document.getElementById('reg-name').value);
+            form.append('photo', photoBlob, 'photo.jpg');
+            
+            const res = await fetch(API_URL + '/register', { method: 'POST', body: form });
+            const data = await res.json();
+            showResult('reg-result', data.msg, data.success);
+        }
+
+        async function login() {
+            const form = new FormData();
+            form.append('username', document.getElementById('login-username').value);
+            form.append('password', document.getElementById('login-password').value);
+            
+            const res = await fetch(API_URL + '/login', { method: 'POST', body: form, credentials: 'include' });
+            const data = await res.json();
+            showResult('login-result', data.msg, data.success);
+            if (data.success) {
+                document.getElementById('userInfo').textContent = `当前用户：${data.user.real_name}`;
+            }
+        }
+
+        async function logout() {
+            await fetch(API_URL + '/logout', { method: 'POST', credentials: 'include' });
+            document.getElementById('userInfo').textContent = '请先登录查看记录';
+            showResult('login-result', '已注销', true);
+        }
+
+        async function checkin() {
+            if (!photoBlob) { showResult('checkin-result', '请先拍照', false); return; }
+            
+            const form = new FormData();
+            form.append('photo', photoBlob, 'photo.jpg');
+            
+            const res = await fetch(API_URL + '/checkin', { method: 'POST', body: form });
+            const data = await res.json();
+            showResult('checkin-result', data.msg, data.success);
+        }
+
+        async function loadRecords() {
+            const res = await fetch(API_URL + '/records', { credentials: 'include' });
+            const data = await res.json();
+            const list = document.getElementById('records-list');
+            
+            if (!data.success) {
+                list.innerHTML = '<p style="text-align:center;color:#999;">请先登录</p>';
+                return;
+            }
+            
+            list.innerHTML = data.records.map(r => `
+                <div class="record-item">
+                    <span>${r.time}</span>
+                    <span>置信度: ${(r.confidence).toFixed(2)}%</span>
+                </div>
+            `).join('') || '<p style="text-align:center;color:#999;">暂无记录</p>';
+        }
+    </script>
+</body>
+</html>
