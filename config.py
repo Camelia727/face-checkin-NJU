@@ -24,4 +24,4 @@ MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 最大上传 10MB
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png'}
 
 # ========== Flask配置 ==========
-SECRET_KEY = 'your-secret-key-change-this'
+SECRET_KEY = 'flask-secret-key-here'

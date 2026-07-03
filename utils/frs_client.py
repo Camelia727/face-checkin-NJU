@@ -1,12 +1,12 @@
-"""华为云FRS人脸识别服务封装"""
+"""华为云FRS人脸识别服务封装 - 兼容 SDK 3.x"""
 
 from huaweicloudsdkcore.auth.credentials import BasicCredentials
 from huaweicloudsdkfrs.v2 import FrsClient
 from huaweicloudsdkfrs.v2.region.frs_region import FrsRegion
 from huaweicloudsdkfrs.v2.model import (
-    CreateFaceSetReq, FaceSet,
-    AddFacesReq, AddFacesUrlReq,
-    SearchFaceByUrlReq
+    CreateFaceSetRequest, CreateFaceSetReq,
+    AddFacesByUrlRequest, AddFacesUrlReq,
+    SearchFaceByUrlRequest, FaceSearchUrlReq,
 )
 from config import (
     OBS_ACCESS_KEY, OBS_SECRET_KEY, FRS_PROJECT_ID,
@@ -32,7 +32,9 @@ def init_face_set():
     """初始化人脸库（如果不存在则创建）"""
     client = get_frs_client()
     try:
-        client.create_face_set(CreateFaceSetReq(FaceSet(name=FACE_SET_NAME)))
+        request = CreateFaceSetRequest()
+        request.body = CreateFaceSetReq(face_set_name=FACE_SET_NAME)
+        client.create_face_set(request)
     except Exception:
         pass  # 已存在则忽略
 
@@ -49,13 +51,14 @@ def add_face(image_url, external_image_id):
         str: face_id，失败返回None
     """
     client = get_frs_client()
-    req = AddFacesReq(
-        face_set_name=FACE_SET_NAME,
-        body=AddFacesUrlReq(external_image_id=external_image_id, image_url=image_url)
+    request = AddFacesByUrlRequest(face_set_name=FACE_SET_NAME)
+    request.body = AddFacesUrlReq(
+        external_image_id=external_image_id,
+        image_url=image_url
     )
-    resp = client.add_faces(req)
-    if resp.faces and len(resp.faces) > 0:
-        return resp.faces[0].face_id
+    response = client.add_faces_by_url(request)
+    if response.faces and len(response.faces) > 0:
+        return response.faces[0].face_id
     return None
 
 
@@ -74,22 +77,20 @@ def search_face(image_url, threshold=None):
         threshold = FACE_SEARCH_THRESHOLD
 
     client = get_frs_client()
-    req = SearchFaceByUrlReq(image_url=image_url)
-    resp = client.search_face_by_url(FACE_SET_NAME, req)
+    request = SearchFaceByUrlRequest(face_set_name=FACE_SET_NAME)
+    request.body = FaceSearchUrlReq(image_url=image_url)
+    response = client.search_face_by_url(request)
 
-    if not resp.faces or len(resp.faces) == 0:
+    if not response.faces or len(response.faces) == 0:
         return None
 
-    # 多脸检测：取最佳匹配
-    best_match = resp.faces[0]
+    best_match = response.faces[0]
 
-    # 置信度不足则拒绝
     if best_match.similarity < threshold:
         return None
 
-    # 多脸判定：如果存在第二张高置信度人脸，说明画面不干净，拒绝签到
-    if len(resp.faces) > 1:
-        second_best = resp.faces[1]
+    if len(response.faces) > 1:
+        second_best = response.faces[1]
         if second_best.similarity >= threshold * 0.8:
             return None
 
