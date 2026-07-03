@@ -1,20 +1,18 @@
-"""所有配置集中在这里"""
-
 # ========== 华为云RDS配置 ==========
-RDS_HOST = '你的RDS内网地址'
+RDS_HOST = '172.16.0.13'
 RDS_PORT = 3306
-RDS_USER = '你的RDS用户名'
-RDS_PASSWORD = '你的RDS密码'
+RDS_USER = 'root'
+RDS_PASSWORD = 'Camelia727.'
 RDS_DB = 'face_checkin'
 
 # ========== 华为云OBS配置 ==========
-OBS_ACCESS_KEY = '你的AK'
-OBS_SECRET_KEY = '你的SK'
+OBS_ACCESS_KEY = 'HPUAN5BPTJME7KDNL9M7'
+OBS_SECRET_KEY = 'DpxD8xlOAqEjgb2utbIrVscvh9vHEY3geE2T5lQ1'
 OBS_SERVER = 'obs.cn-east-3.myhuaweicloud.com'  # 根据区域修改
-OBS_BUCKET = '你的桶名'
+OBS_BUCKET = 'face-checkin'
 
 # ========== 华为云FRS配置 ==========
-FRS_PROJECT_ID = '你的项目ID'
+FRS_PROJECT_ID = 'e89534a28c824118a34ed960ed6c66a5'
 FRS_REGION = 'cn-east-3'
 FACE_SET_NAME = 'face_checkin_set'
 

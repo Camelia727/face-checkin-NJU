@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+preview_server.py
+screenshot.py
+preview.png
+test_core.py
+.DS_Store
